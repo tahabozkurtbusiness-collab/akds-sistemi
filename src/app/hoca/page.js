@@ -473,19 +473,19 @@ export default function HocaPaneli() {
 
                     {/* QR Kod Çerçevesi */}
                     <div className="relative p-3 bg-white border-2 border-dashed border-[#2A81EA] rounded-xl shadow-sm inline-block">
-                      {/* KSÜ Mavisi (#2A81EA) Renginde Üretilen QR Kod */}
+                      {/* VİZYON: Yüksek Hata Korumalı (ecc=H) ve Siyah QR Kod (Kamera saniyede okusun diye) */}
                       <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&color=2A81EA&data=${typeof window !== "undefined" ? window.location.origin : ""}/misafir`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&ecc=H&margin=1&data=${typeof window !== "undefined" ? window.location.origin : ""}/misafir`}
                         alt="QR Kod"
                         className="w-40 h-40 md:w-48 md:h-48"
                       />
 
-                      {/* QR Kodun Tam Ortasına Oturan KSÜ Logosu */}
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-1.5 rounded-xl shadow-lg border border-gray-100">
+                      {/* QR Kodun Tam Ortasına Oturan KSÜ Logosu (Boyutu kamerayı engellemeyecek şekilde optimize edildi) */}
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-1.5 rounded-lg shadow-md flex items-center justify-center">
                         <img
                           src="/logo.png"
                           alt="Merkez Logo"
-                          className="w-8 h-8 md:w-10 md:h-10 object-contain"
+                          className="w-7 h-7 md:w-9 md:h-9 object-contain"
                         />
                       </div>
                     </div>
