@@ -472,20 +472,20 @@ export default function HocaPaneli() {
                     </p>
 
                     {/* QR Kod Çerçevesi */}
-                    <div className="relative p-3 bg-white border-2 border-dashed border-[#2A81EA] rounded-xl shadow-sm inline-block">
-                      {/* VİZYON: Yüksek Hata Korumalı (ecc=H) ve Siyah QR Kod (Kamera saniyede okusun diye) */}
+                    <div className="relative p-2 bg-white border-2 border-dashed border-[#2A81EA] rounded-xl shadow-sm inline-block">
+                      {/* VİZYON 1: encodeURIComponent ile URL şifrelendi, bozulma tamamen önlendi! */}
                       <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&ecc=H&margin=1&data=${typeof window !== "undefined" ? window.location.origin : ""}/misafir`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=H&margin=1&data=${typeof window !== "undefined" ? encodeURIComponent(window.location.origin + "/misafir") : ""}`}
                         alt="QR Kod"
-                        className="w-40 h-40 md:w-48 md:h-48"
+                        className="w-48 h-48 md:w-56 md:h-56"
                       />
 
-                      {/* QR Kodun Tam Ortasına Oturan KSÜ Logosu (Boyutu kamerayı engellemeyecek şekilde optimize edildi) */}
-                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white p-1.5 rounded-lg shadow-md flex items-center justify-center">
+                      {/* VİZYON 2: Logo yuvarlak (rounded-full) yapıldı. QR verisini daha az kapatır. */}
+                      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1.5 shadow-lg flex items-center justify-center w-12 h-12 md:w-14 md:h-14">
                         <img
                           src="/logo.png"
                           alt="Merkez Logo"
-                          className="w-7 h-7 md:w-9 md:h-9 object-contain"
+                          className="w-9 h-9 md:w-11 md:h-11 object-contain"
                         />
                       </div>
                     </div>
