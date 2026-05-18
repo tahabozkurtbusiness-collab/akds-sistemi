@@ -10,9 +10,10 @@ export default function MisafirGirisi() {
   useEffect(() => {
     const misafirOlustur = async () => {
       try {
-        // 1. Rastgele bir İzleyici Numarası Üret
-        const rastgeleSayi = Math.floor(Math.random() * 1000000);
-        const misafirNo = `M-${rastgeleSayi}`;
+        // 1. KUSURSUZ BENZERSİZ NUMARA ÜRETİMİ (Zaman Damgası + Rastgele Sayı)
+        const zamanDamgasi = Date.now().toString().slice(-4); // Zamanın son 4 hanesi
+        const rastgeleSayi = Math.floor(1000 + Math.random() * 9000); // 4 haneli rastgele
+        const misafirNo = `M-${zamanDamgasi}${rastgeleSayi}`;
         const misafirAd = `Konuk İzleyici ${rastgeleSayi.toString().substring(0, 3)}`;
 
         setDurum("Geçici oturum kimliği oluşturuluyor...");
