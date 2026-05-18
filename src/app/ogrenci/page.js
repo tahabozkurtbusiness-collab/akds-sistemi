@@ -15,14 +15,6 @@ export default function OgrenciPaneli() {
   const [spamKorumasi, setSpamKorumasi] = useState(false);
   const [molaModu, setMolaModu] = useState(false);
   const [dersBitti, setDersBitti] = useState(false);
-  const [anketAcik, setAnketAcik] = useState(false);
-  const [cevaplar, setCevaplar] = useState({
-    vaktindeGeldi: null,
-    konuIslendi: null,
-  });
-  const [anketTamamlandi, setAnketTamamlandi] = useState(false);
-  const [islemSuruyor, setIslemSuruyor] = useState(false);
-  const [anketGerekliMi, setAnketGerekliMi] = useState(true);
 
   useEffect(() => {
     const baslangicKontrolu = async () => {
@@ -39,7 +31,7 @@ export default function OgrenciPaneli() {
       }
       setOgrenci(kullaniciVerisi);
 
-      // F5 SPAM KORUMASI
+      // F5 SPAM KORUMASI (Anlamadım butonu için)
       const sonTiklama = localStorage.getItem("sonAnlamadimZamani");
       if (sonTiklama) {
         const gecenZaman = Date.now() - parseInt(sonTiklama);
@@ -52,11 +44,10 @@ export default function OgrenciPaneli() {
       }
 
       // F5 KORUMASI: Öğrenci zaten aktif bir derste mi?
-      // F5 KORUMASI: Öğrenci zaten aktif veya anket bekleyen bir derste mi?
       try {
         const { data: yoklamalar } = await supabase
           .from("attendance")
-          .select("oturum_id, yoklama_gecerli_mi") // Geçerlilik durumunu da çekiyoruz
+          .select("oturum_id")
           .eq("ogrenci_id", kullaniciVerisi.id);
 
         if (yoklamalar && yoklamalar.length > 0) {
@@ -66,32 +57,21 @@ export default function OgrenciPaneli() {
             .from("sessions")
             .select("*")
             .in("id", oturumIdleri)
-            .in("durum", ["aktif", "uyku_modu", "bitti"]) // VİZYON: "bitti" statüsünü de arıyoruz
+            .in("durum", ["aktif", "uyku_modu", "bitti"])
             .order("id", { ascending: false })
             .limit(1);
 
           if (aktifOturumData && aktifOturumData.length > 0) {
             const bulunanOturum = aktifOturumData[0];
 
-            // İlgili oturumun yoklama detayını bul
-            const yoklamaDetay = yoklamalar.find(
-              (y) => y.oturum_id === bulunanOturum.id,
-            );
-
-            // Eğer ders aktif veya uykudaysa normal devam et
             if (bulunanOturum.durum !== "bitti") {
               setAktifOturum(bulunanOturum);
               setDersteMi(true);
-            }
-            // Eğer ders BİTMİŞSE ama öğrenci anketi doldurmamışsa (yoklama_gecerli_mi null/false ise)
-            else if (
-              bulunanOturum.durum === "bitti" &&
-              !yoklamaDetay?.yoklama_gecerli_mi
-            ) {
+              if (bulunanOturum.durum === "uyku_modu") setMolaModu(true);
+            } else {
               setAktifOturum(bulunanOturum);
               setDersteMi(true);
               setDersBitti(true);
-              setAnketGerekliMi(true); // F5 atıp kaçmaya çalışanlara zorunlu anket
             }
           }
         }
@@ -125,15 +105,6 @@ export default function OgrenciPaneli() {
           }
           if (payload.new.durum === "bitti") {
             setDersBitti(true);
-
-            // Anket yorgunluğunu önleme algoritması
-            const anketCiksinMi =
-              ogrenci.kullanici_no === "220011" ? true : Math.random() <= 0.3;
-            setAnketGerekliMi(anketCiksinMi);
-
-            if (!anketCiksinMi) {
-              otomatikYoklamaOnayla();
-            }
           }
         },
       )
@@ -144,21 +115,8 @@ export default function OgrenciPaneli() {
     };
   }, [aktifOturum, ogrenci]);
 
-  // Şanslı öğrenciler için otomatik yoklama onayı
-  const otomatikYoklamaOnayla = async () => {
-    try {
-      await supabase
-        .from("attendance")
-        .update({ yoklama_gecerli_mi: true })
-        .eq("oturum_id", aktifOturum.id)
-        .eq("ogrenci_id", ogrenci.id);
-      setAnketTamamlandi(true);
-    } catch (error) {
-      console.error("Otomatik onay hatası:", error);
-    }
-  };
-
   const yoklamayaKatil = async () => {
+    if (yukleniyor) return; // ÇİFTE ZIRH: Eğer saniyede 10 kere basılırsa diğerlerini engelle
     if (girilenKod.length !== 4) {
       alert("Lütfen 4 haneli kodu girin!");
       return;
@@ -193,10 +151,12 @@ export default function OgrenciPaneli() {
         return;
       }
 
+      // Veritabanına kaydederken doğrudan anket onaylı (true) gibi kaydediyoruz
       const { error: kayitHata } = await supabase.from("attendance").insert([
         {
           oturum_id: oturumData.id,
           ogrenci_id: ogrenci.id,
+          yoklama_gecerli_mi: true,
         },
       ]);
 
@@ -237,37 +197,6 @@ export default function OgrenciPaneli() {
     }
   };
 
-  // Anket Gönderme Fonksiyonu
-  const anketiGonder = async () => {
-    if (cevaplar.vaktindeGeldi === null || cevaplar.konuIslendi === null) {
-      alert("Lütfen tüm soruları cevaplayın.");
-      return;
-    }
-
-    setIslemSuruyor(true);
-
-    try {
-      const { error } = await supabase
-        .from("attendance")
-        .update({
-          hoca_vaktinde_geldi: cevaplar.vaktindeGeldi,
-          konu_islendi: cevaplar.konuIslendi,
-          yoklama_gecerli_mi: true,
-        })
-        .eq("oturum_id", aktifOturum.id)
-        .eq("ogrenci_id", ogrenci.id);
-
-      if (error) throw error;
-
-      setAnketTamamlandi(true);
-    } catch (error) {
-      console.error("Anket hatası:", error);
-      alert("Anket gönderilirken bir hata oluştu.");
-    } finally {
-      setIslemSuruyor(false);
-    }
-  };
-
   if (!ogrenci || !sayfaHazir) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -280,8 +209,6 @@ export default function OgrenciPaneli() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      {/* KSÜ RESMİ WEB SİTESİ KLONU - ÜST BAR */}
-      {/* AKDS KURUMSAL ÜST BAR */}
       <header className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-6 shadow-sm mb-8 border-b border-gray-200 rounded">
         <div className="flex items-center gap-4 mb-4 md:mb-0">
           <img
@@ -296,7 +223,6 @@ export default function OgrenciPaneli() {
             <span className="text-[1.1rem] md:text-xl font-bold text-gray-800 tracking-wide leading-tight">
               SÜTÇÜ İMAM ÜNİVERSİTESİ
             </span>
-            {/* İŞTE AKDS VİZYON YAZISI BURADA! */}
             <span className="text-[0.75rem] md:text-xs font-black text-[#2A81EA] uppercase tracking-widest mt-1">
               AKDS - Akademik Kalite Denetim Sistemi
             </span>
@@ -315,7 +241,6 @@ export default function OgrenciPaneli() {
 
       <main className="max-w-md mx-auto">
         {!dersteMi ? (
-          // YOKLAMAYA KATILMA EKRANI
           <div className="bg-white p-8 rounded shadow-sm border border-gray-200 text-center">
             <div className="w-16 h-16 bg-[#f0f6ff] rounded flex items-center justify-center mx-auto mb-4 border border-[#e0edff]">
               <svg
@@ -357,143 +282,31 @@ export default function OgrenciPaneli() {
             </button>
           </div>
         ) : dersBitti ? (
-          // DERS BİTTİ VE AKILLI ANKET EKRANI
-          <div className="bg-white p-8 rounded shadow-sm border border-gray-200 text-center transition-all duration-500">
-            {anketTamamlandi ? (
-              // 3. AŞAMA: ANKET BİTTİ (Nihai Onay)
-              <div className="animate-fade-in">
-                <div className="w-20 h-20 bg-green-50 rounded flex items-center justify-center mx-auto mb-4 border border-green-100">
-                  <svg
-                    className="w-10 h-10 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M5 13l4 4L19 7"
-                    ></path>
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-800 mb-2">
-                  Yoklamanız Onaylandı
-                </h2>
-                <p className="text-gray-600 text-sm">
-                  {anketGerekliMi
-                    ? "Geri bildiriminiz için teşekkürler. Yoklamanız resmi olarak geçerli sayılmıştır. Çıkabilirsiniz."
-                    : "Akıllı denetim sistemi, anket yorgunluğunu önlemek amacıyla bu derste sizi anketten muaf tuttu. Yoklamanız otomatik olarak onaylanmıştır. Çıkabilirsiniz."}
-                </p>
-              </div>
-            ) : anketAcik ? (
-              // 2. AŞAMA: SORULAR
-              <div className="text-left animate-fade-in">
-                <h2 className="text-xl font-bold text-[#2A81EA] mb-2 text-center">
-                  Kalite Denetim Anketi
-                </h2>
-                <p className="text-xs text-gray-500 mb-6 text-center bg-gray-50 py-2 rounded font-medium border border-gray-100">
-                  Cevaplarınız %100 anonim olarak kaydedilir.
-                </p>
-
-                <div className="mb-5">
-                  <p className="font-semibold text-gray-800 mb-3 text-sm">
-                    1. Öğretim görevlisi derse vaktinde geldi mi?
-                  </p>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() =>
-                        setCevaplar({ ...cevaplar, vaktindeGeldi: true })
-                      }
-                      className={`flex-1 py-3 rounded font-bold border-2 transition-all ${cevaplar.vaktindeGeldi === true ? "bg-[#2A81EA] text-white border-[#2A81EA]" : "bg-white text-gray-600 border-gray-200 hover:border-[#2A81EA]"}`}
-                    >
-                      Evet
-                    </button>
-                    <button
-                      onClick={() =>
-                        setCevaplar({ ...cevaplar, vaktindeGeldi: false })
-                      }
-                      className={`flex-1 py-3 rounded font-bold border-2 transition-all ${cevaplar.vaktindeGeldi === false ? "bg-[#2A81EA] text-white border-[#2A81EA]" : "bg-white text-gray-600 border-gray-200 hover:border-[#2A81EA]"}`}
-                    >
-                      Hayır
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mb-8">
-                  <p className="font-semibold text-gray-800 mb-3 text-sm">
-                    2. Müfredattaki konu işlendi mi?
-                  </p>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() =>
-                        setCevaplar({ ...cevaplar, konuIslendi: true })
-                      }
-                      className={`flex-1 py-3 rounded font-bold border-2 transition-all ${cevaplar.konuIslendi === true ? "bg-[#2A81EA] text-white border-[#2A81EA]" : "bg-white text-gray-600 border-gray-200 hover:border-[#2A81EA]"}`}
-                    >
-                      Evet
-                    </button>
-                    <button
-                      onClick={() =>
-                        setCevaplar({ ...cevaplar, konuIslendi: false })
-                      }
-                      className={`flex-1 py-3 rounded font-bold border-2 transition-all ${cevaplar.konuIslendi === false ? "bg-[#2A81EA] text-white border-[#2A81EA]" : "bg-white text-gray-600 border-gray-200 hover:border-[#2A81EA]"}`}
-                    >
-                      Hayır
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  onClick={anketiGonder}
-                  disabled={
-                    islemSuruyor ||
-                    cevaplar.vaktindeGeldi === null ||
-                    cevaplar.konuIslendi === null
-                  }
-                  className="w-full bg-[#2A81EA] hover:bg-[#1e6bcc] disabled:bg-gray-400 text-white font-bold py-3.5 rounded shadow transition-all"
-                >
-                  {islemSuruyor
-                    ? "Sisteme İşleniyor..."
-                    : "Gönder ve Yoklamayı Onayla"}
-                </button>
-              </div>
-            ) : (
-              // 1. AŞAMA: ANKET GİRİŞ EKRANI
-              <div className="animate-fade-in">
-                <div className="w-16 h-16 bg-[#f0f6ff] rounded flex items-center justify-center mx-auto mb-4 border border-[#e0edff]">
-                  <svg
-                    className="w-8 h-8 text-[#2A81EA]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    ></path>
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-800 mb-2">
-                  Oturum Sona Erdi
-                </h2>
-                <p className="text-gray-500 text-sm mb-6">
-                  Yoklamanızın geçerli sayılması için kalite denetim anketini
-                  doldurmanız gerekmektedir.
-                </p>
-                <button
-                  onClick={() => setAnketAcik(true)}
-                  className="w-full bg-[#2A81EA] hover:bg-[#1e6bcc] text-white font-bold py-3.5 rounded shadow transition-all"
-                >
-                  Anketi Doldur
-                </button>
-              </div>
-            )}
+          <div className="bg-white p-8 rounded shadow-sm border border-gray-200 text-center transition-all duration-500 animate-fade-in">
+            <div className="w-20 h-20 bg-green-50 rounded flex items-center justify-center mx-auto mb-4 border border-green-100">
+              <svg
+                className="w-10 h-10 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M5 13l4 4L19 7"
+                ></path>
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">
+              Oturum Sona Erdi
+            </h2>
+            <p className="text-gray-600 text-sm">
+              Katılımınız başarıyla sisteme işlenmiş ve onaylanmıştır.
+              Çıkabilirsiniz, iyi günler dileriz.
+            </p>
           </div>
         ) : molaModu ? (
-          // MOLA EKRANI (UYKU MODU)
           <div className="bg-white p-8 rounded shadow-sm border border-yellow-200 text-center transition-all duration-500">
             <div className="w-16 h-16 bg-yellow-50 rounded flex items-center justify-center mx-auto mb-4 border border-yellow-100 animate-pulse">
               <svg
@@ -519,7 +332,6 @@ export default function OgrenciPaneli() {
             </p>
           </div>
         ) : (
-          // AKTİF DERS EKRANI VE ANLAMADIM BUTONU
           <div className="bg-white p-8 rounded shadow-sm border border-green-200 text-center transition-all duration-500">
             <div className="w-16 h-16 bg-green-50 rounded flex items-center justify-center mx-auto mb-4 border border-green-100">
               <svg
@@ -550,11 +362,7 @@ export default function OgrenciPaneli() {
               <button
                 onClick={anlamadimBildir}
                 disabled={spamKorumasi}
-                className={`w-full text-white font-bold py-3.5 rounded shadow transition-all ${
-                  spamKorumasi
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-orange-500 hover:bg-orange-600"
-                }`}
+                className={`w-full text-white font-bold py-3.5 rounded shadow transition-all ${spamKorumasi ? "bg-gray-400 cursor-not-allowed" : "bg-orange-500 hover:bg-orange-600"}`}
               >
                 {spamKorumasi
                   ? "Bildirim İletildi (60sn Bekleyin)"
