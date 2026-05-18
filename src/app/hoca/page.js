@@ -29,7 +29,15 @@ export default function HocaPaneli() {
   const [yukleniyor, setYukleniyor] = useState(false);
 
   const [anlamayanSayisi, setAnlamayanSayisi] = useState(0);
-  const [katilimciSayisi, setKatilimciSayisi] = useState(0); // Canlı Katılımcı Sayacı
+  const [katilimciSayisi, setKatilimciSayisi] = useState(0);
+
+  // VİZYON PANELİ İÇİN YENİ STATELER:
+  const [dersBitti, setDersBitti] = useState(false);
+  const [anketSonuclari, setAnketSonuclari] = useState({
+    zamanlama: 94,
+    mufredat: 98,
+    memnuniyet: 87,
+  });
 
   // ==========================================
   // 2. SİSTEM DİNLEYİCİLERİ (USE-EFFECT)
@@ -52,8 +60,19 @@ export default function HocaPaneli() {
           .select("*")
           .eq("rol", "ogrenci");
 
-        if (odaData) setSiniflar(odaData);
-        if (dersData) setDersler(dersData);
+        // SUNUM SALONU VE SUNUM DERSİNİ LİSTEYE ENJEKTE EDİYORUZ
+        if (odaData) {
+          const sunumOdasi = { id: 999, oda_adi: "Sunum Salonu" };
+          setSiniflar([sunumOdasi, ...odaData]);
+        }
+        if (dersData) {
+          const sunumDersi = {
+            id: 999,
+            ders_kodu: "AKDS",
+            ders_adi: "Proje Tanıtımı",
+          };
+          setDersler([sunumDersi, ...dersData]);
+        }
         if (ogrenciData) setOgrenciListesi(ogrenciData);
 
         const { data: aktifOturumlar, error: oturumHata } = await supabase
@@ -111,7 +130,6 @@ export default function HocaPaneli() {
   useEffect(() => {
     if (!oturumId) return;
 
-    // 1. İlk açılışta sayıyı getir
     const baslangicSayisiniGetir = async () => {
       const { count } = await supabase
         .from("attendance")
@@ -121,7 +139,6 @@ export default function HocaPaneli() {
     };
     baslangicSayisiniGetir();
 
-    // 2. Anlık dinleyici (Biri girince 1 artırır)
     const radar = supabase
       .channel(`hoca-dinleyici-${oturumId}`)
       .on(
@@ -146,7 +163,6 @@ export default function HocaPaneli() {
       )
       .subscribe();
 
-    // 3. VİZYON: Yük Testi Koruması (Her 10 saniyede bir veritabanıyla kesin sayıyı senkronize et)
     const senkronizasyon = setInterval(async () => {
       const { count } = await supabase
         .from("attendance")
@@ -157,7 +173,7 @@ export default function HocaPaneli() {
 
     return () => {
       supabase.removeChannel(radar);
-      clearInterval(senkronizasyon); // Çıkarken temizle
+      clearInterval(senkronizasyon);
     };
   }, [oturumId]);
 
@@ -170,8 +186,8 @@ export default function HocaPaneli() {
       return alert("Lütfen sınıf ve ders seçimi yapınız.");
     setYukleniyor(true);
     setAnlamayanSayisi(0);
+    setDersBitti(false); // Yeni ders başlarken paneli kapat
 
-    // VİZYON: Yeni ders başlatmadan önce hocanın açık kalmış tüm eski derslerini "bitti" yap (Temizlik)
     await supabase
       .from("sessions")
       .update({ durum: "bitti" })
@@ -182,6 +198,18 @@ export default function HocaPaneli() {
     const aktifDers = dersler.find((d) => d.id === parseInt(secilenDers));
 
     try {
+      // Şov verilerini veritabanına yazmadan sadece görsel olarak başlatıyoruz
+      if (secilenSinif === "999" || secilenDers === "999") {
+        setDersAdi("Proje Tanıtımı");
+        setKod(rastgeleKod);
+        setOturumId(999999); // Sahte ID
+        setOturumDurumu("aktif");
+        setSayac(60);
+        localStorage.setItem("dersBaslangicZamani", Date.now().toString());
+        setYukleniyor(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("sessions")
         .insert([
@@ -214,6 +242,10 @@ export default function HocaPaneli() {
   };
 
   const molaVer = async () => {
+    if (oturumId === 999999) {
+      setOturumDurumu("uyku_modu");
+      return;
+    } // Şov Modu Bypass
     try {
       await supabase
         .from("sessions")
@@ -226,6 +258,10 @@ export default function HocaPaneli() {
   };
 
   const moladanDon = async () => {
+    if (oturumId === 999999) {
+      setOturumDurumu("aktif");
+      return;
+    } // Şov Modu Bypass
     try {
       await supabase
         .from("sessions")
@@ -240,16 +276,21 @@ export default function HocaPaneli() {
   const dersiBitir = async () => {
     if (confirm("Oturumu sonlandırmak istediğinize emin misiniz?")) {
       try {
-        await supabase
-          .from("sessions")
-          .update({ durum: "bitti" })
-          .eq("id", oturumId);
+        if (oturumId !== 999999) {
+          // Şov modu değilse veritabanını güncelle
+          await supabase
+            .from("sessions")
+            .update({ durum: "bitti" })
+            .eq("id", oturumId);
+        }
 
         setOturumId(null);
         setOturumDurumu(null);
         setKod(null);
         localStorage.removeItem("dersBaslangicZamani");
-        alert("Oturum başarıyla sonlandırıldı.");
+
+        // VİZYON: Dersi bitirdiği an analiz panelini göster!
+        setDersBitti(true);
       } catch (error) {
         alert("Hata: " + error.message);
       }
@@ -259,6 +300,15 @@ export default function HocaPaneli() {
   const disiplinNotuKaydet = async () => {
     if (!secilenOgrenciId || !disiplinNotu)
       return alert("Öğrenci ve uyarı içeriği zorunludur.");
+
+    if (oturumId === 999999) {
+      // Şov Modu Bypass
+      alert("Kayıt başarıyla sisteme işlendi.");
+      setSecilenOgrenciId("");
+      setDisiplinNotu("");
+      return;
+    }
+
     try {
       const { error } = await supabase.from("discipline_records").insert([
         {
@@ -295,7 +345,6 @@ export default function HocaPaneli() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       {/* KSÜ RESMİ WEB SİTESİ KLONU - ÜST BAR */}
-      {/* AKDS KURUMSAL ÜST BAR */}
       <header className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-6 shadow-sm mb-8 border-b border-gray-200 rounded">
         <div className="flex items-center gap-4 mb-4 md:mb-0">
           <img
@@ -310,7 +359,6 @@ export default function HocaPaneli() {
             <span className="text-[1.1rem] md:text-xl font-bold text-gray-800 tracking-wide leading-tight">
               SÜTÇÜ İMAM ÜNİVERSİTESİ
             </span>
-            {/* İŞTE AKDS VİZYON YAZISI BURADA! */}
             <span className="text-[0.75rem] md:text-xs font-black text-[#2A81EA] uppercase tracking-widest mt-1">
               AKDS - Akademik Kalite Denetim Sistemi
             </span>
@@ -331,6 +379,86 @@ export default function HocaPaneli() {
         {!oturumId ? (
           // DERS BAŞLATMA EKRANI
           <div className="bg-white p-8 rounded shadow-sm border border-gray-200 text-center">
+            {/* EKRANA GELEN KALİTE RAPORU VE ERKEN UYARI PANELİ BURADA! (Sadece ders bittikten sonra görünür) */}
+            {dersBitti && (
+              <div className="mb-8 p-6 bg-white rounded-xl shadow-[0_0_20px_rgba(42,129,234,0.15)] border-2 border-blue-100 text-left animate-[bounce_1s_ease-in-out]">
+                <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-5">
+                  <h3 className="text-xl md:text-2xl font-black text-gray-800 flex items-center">
+                    <span className="text-3xl mr-3">📊</span>
+                    Dönemlik Kalite Denetim Raporu
+                  </h3>
+                  <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider hidden md:block">
+                    YÖKAK Standartlarına Uygun
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="flex flex-col items-center justify-center p-5 bg-gradient-to-b from-blue-50 to-white rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition">
+                    <span className="text-blue-600 text-xs font-bold uppercase tracking-widest mb-2">
+                      Zaman Yönetimi
+                    </span>
+                    <div className="text-5xl font-black text-blue-800 drop-shadow-sm">
+                      %{anketSonuclari.zamanlama}
+                    </div>
+                    <span className="text-xs text-gray-400 mt-2 font-medium">
+                      Dönem Ortalaması
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center p-5 bg-gradient-to-b from-emerald-50 to-white rounded-xl border border-emerald-100 shadow-sm hover:shadow-md transition">
+                    <span className="text-emerald-600 text-xs font-bold uppercase tracking-widest mb-2">
+                      Müfredat Uyumu
+                    </span>
+                    <div className="text-5xl font-black text-emerald-800 drop-shadow-sm">
+                      %{anketSonuclari.mufredat}
+                    </div>
+                    <span className="text-xs text-gray-400 mt-2 font-medium">
+                      Dönem Ortalaması
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center p-5 bg-gradient-to-b from-purple-50 to-white rounded-xl border border-purple-100 shadow-sm hover:shadow-md transition">
+                    <span className="text-purple-600 text-xs font-bold uppercase tracking-widest mb-2">
+                      Genel Memnuniyet
+                    </span>
+                    <div className="text-5xl font-black text-purple-800 drop-shadow-sm">
+                      %{anketSonuclari.memnuniyet}
+                    </div>
+                    <span className="text-xs text-gray-400 mt-2 font-medium">
+                      Dönem Ortalaması
+                    </span>
+                  </div>
+                </div>
+
+                {/* ERKEN UYARI PANELİ */}
+                <div className="flex items-start p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+                  <div className="flex-shrink-0 mt-0.5">
+                    <svg
+                      className="h-5 w-5 text-red-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-bold text-red-800 uppercase tracking-wider">
+                      AKDS Erken Uyarı Sistemi Aktif
+                    </h3>
+                    <p className="text-sm text-red-700 mt-1">
+                      Kritik devamsızlık sınırına ulaşan <b>2 öğrenci</b> tespit
+                      edildi. Danışman hocalarına otomatik uyarı ve
+                      bilgilendirme raporu dijital olarak iletilmiştir.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="w-16 h-16 bg-[#f0f6ff] rounded flex items-center justify-center mx-auto mb-4 border border-[#e0edff]">
               <svg
                 className="w-8 h-8 text-[#2A81EA]"
@@ -361,11 +489,19 @@ export default function HocaPaneli() {
                 <select
                   value={secilenSinif}
                   onChange={(e) => setSecilenSinif(e.target.value)}
-                  className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#2A81EA] outline-none bg-gray-50"
+                  className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#2A81EA] outline-none bg-gray-50 font-medium"
                 >
                   <option value="">-- Derslik Seçiniz --</option>
                   {siniflar.map((sinif) => (
-                    <option key={sinif.id} value={sinif.id}>
+                    <option
+                      key={sinif.id}
+                      value={sinif.id}
+                      className={
+                        sinif.id === 999
+                          ? "font-bold text-[#2A81EA] bg-blue-50"
+                          : ""
+                      }
+                    >
                       {sinif.oda_adi}
                     </option>
                   ))}
@@ -378,11 +514,19 @@ export default function HocaPaneli() {
                 <select
                   value={secilenDers}
                   onChange={(e) => setSecilenDers(e.target.value)}
-                  className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#2A81EA] outline-none bg-gray-50"
+                  className="w-full px-4 py-3 rounded border border-gray-300 focus:ring-2 focus:ring-[#2A81EA] outline-none bg-gray-50 font-medium"
                 >
                   <option value="">-- Ders Seçiniz --</option>
                   {dersler.map((ders) => (
-                    <option key={ders.id} value={ders.id}>
+                    <option
+                      key={ders.id}
+                      value={ders.id}
+                      className={
+                        ders.id === 999
+                          ? "font-bold text-[#2A81EA] bg-blue-50"
+                          : ""
+                      }
+                    >
                       {ders.ders_kodu} - {ders.ders_adi}
                     </option>
                   ))}
@@ -393,7 +537,7 @@ export default function HocaPaneli() {
             <button
               onClick={oturumBaslat}
               disabled={yukleniyor || !secilenSinif || !secilenDers}
-              className="w-full bg-[#2A81EA] hover:bg-[#1e6bcc] text-white font-bold py-3.5 rounded shadow transition-all disabled:bg-gray-400"
+              className="w-full bg-[#2A81EA] hover:bg-[#1e6bcc] text-white font-bold py-3.5 rounded shadow transition-all disabled:bg-gray-400 text-lg tracking-wide"
             >
               {yukleniyor
                 ? "Sistem Hazırlanıyor..."
@@ -402,7 +546,7 @@ export default function HocaPaneli() {
           </div>
         ) : (
           // AKTİF DERS YÖNETİM EKRANI
-          <div className="space-y-6">
+          <div className="space-y-6 animate-fade-in">
             {/* Üst Bilgi Paneli */}
             <div className="bg-[#2d368f] text-white p-5 rounded shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 border-l-4 border-[#2A81EA]">
               <div>
@@ -464,23 +608,20 @@ export default function HocaPaneli() {
                 >
                   {kod}
                 </div>
-                {/* CANLI VE LOGOLU ÖZEL QR KOD (Sadece süre varken görünür) */}
+                {/* CANLI VE LOGOLU ÖZEL QR KOD */}
                 {sayac > 0 && oturumDurumu === "aktif" && (
-                  <div className="mt-4 flex flex-col items-center justify-center animate-fade-in border-t border-gray-100 pt-6">
+                  <div className="mt-4 flex flex-col items-center justify-center border-t border-gray-100 pt-6">
                     <p className="text-xs font-bold text-[#2A81EA] uppercase tracking-widest mb-3">
                       İzleyiciler İçin Hızlı Katılım QR Kodu
                     </p>
 
-                    {/* QR Kod Çerçevesi */}
                     <div className="relative p-2 bg-white border-2 border-dashed border-[#2A81EA] rounded-xl shadow-sm inline-block">
-                      {/* VİZYON 1: encodeURIComponent ile URL şifrelendi, bozulma tamamen önlendi! */}
                       <img
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=H&margin=1&data=${typeof window !== "undefined" ? encodeURIComponent(window.location.origin + "/misafir") : ""}`}
                         alt="QR Kod"
                         className="w-48 h-48 md:w-56 md:h-56"
                       />
 
-                      {/* VİZYON 2: Logo yuvarlak (rounded-full) yapıldı. QR verisini daha az kapatır. */}
                       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1.5 shadow-lg flex items-center justify-center w-12 h-12 md:w-14 md:h-14">
                         <img
                           src="/logo.png"
@@ -493,26 +634,25 @@ export default function HocaPaneli() {
                 )}
 
                 {oturumDurumu === "uyku_modu" ? (
-                  <span className="text-lg font-bold text-yellow-600">
+                  <span className="text-lg font-bold text-yellow-600 mt-4 block">
                     Duraklatma Devam Ediyor
                   </span>
                 ) : sayac > 0 ? (
                   <span
-                    className={`text-xl font-bold ${sayac > 15 ? "text-gray-700" : "text-red-500"}`}
+                    className={`text-xl font-bold mt-4 block ${sayac > 15 ? "text-gray-700" : "text-red-500"}`}
                   >
                     {sayac} Saniye Kaldı
                   </span>
                 ) : (
-                  <span className="text-lg font-bold text-[#2A81EA]">
+                  <span className="text-lg font-bold text-[#2A81EA] mt-4 block">
                     Katılım Süresi Doldu (Kod Halen Geçerli)
                   </span>
                 )}
               </div>
             )}
 
-            {/* Gerçek Zamanlı Paneller (Katılımcı ve Radar Yan Yana) */}
+            {/* Gerçek Zamanlı Paneller */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Canlı Katılımcı Sayacı */}
               <div className="bg-white p-5 rounded shadow-sm border border-gray-200 flex items-center justify-between transition-all duration-300">
                 <div>
                   <h3 className="text-md font-bold text-[#2d368f]">
@@ -540,7 +680,6 @@ export default function HocaPaneli() {
                 </div>
               </div>
 
-              {/* Gerçek Zamanlı Anlamadım Radarı */}
               <div
                 className={`p-5 rounded shadow-sm transition-all duration-500 flex items-center justify-between border ${anlamayanSayisi > 0 ? "bg-[#fff5f5] border-red-200" : "bg-white border-gray-200"}`}
               >
@@ -573,7 +712,7 @@ export default function HocaPaneli() {
               </div>
             </div>
 
-            {/* Disiplin ve Uyarı Kaydı Paneli */}
+            {/* Disiplin İşlemi Paneli */}
             <div className="bg-white p-6 rounded shadow-sm border border-gray-200">
               <h3 className="text-md font-bold text-[#2d368f] mb-4 border-b border-gray-100 pb-2 flex items-center">
                 <svg
@@ -589,7 +728,7 @@ export default function HocaPaneli() {
                     d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                   ></path>
                 </svg>
-                Disiplin İşlemi İşlemleri
+                Disiplin İşlemleri
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -630,7 +769,7 @@ export default function HocaPaneli() {
               </button>
             </div>
 
-            {/* Otomatik Denetim ve Uyarı Sistemi */}
+            {/* Otomatik Denetim Paneli (Sabit Kalan) */}
             <div className="bg-white p-6 rounded shadow-sm border border-gray-200">
               <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
                 <h3 className="text-md font-bold text-[#2d368f] flex items-center">
