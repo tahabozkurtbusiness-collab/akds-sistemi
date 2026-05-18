@@ -31,13 +31,8 @@ export default function HocaPaneli() {
   const [anlamayanSayisi, setAnlamayanSayisi] = useState(0);
   const [katilimciSayisi, setKatilimciSayisi] = useState(0);
 
-  // VİZYON PANELİ İÇİN YENİ STATELER:
+  // VİZYON PANELİ İÇİN:
   const [dersBitti, setDersBitti] = useState(false);
-  const [anketSonuclari, setAnketSonuclari] = useState({
-    zamanlama: 94,
-    mufredat: 98,
-    memnuniyet: 87,
-  });
 
   // ==========================================
   // 2. SİSTEM DİNLEYİCİLERİ (USE-EFFECT)
@@ -337,62 +332,13 @@ export default function HocaPaneli() {
         {!oturumId ? (
           // DERS BAŞLATMA EKRANI
           <div className="bg-white p-8 rounded shadow-sm border border-gray-200 text-center">
-            {/* EKRANA GELEN KALİTE RAPORU VE ERKEN UYARI PANELİ */}
+            {/* SADECE ERKEN UYARI PANELİ BURADA GÖSTERİLECEK */}
             {dersBitti && (
-              <div className="mb-8 p-6 bg-white rounded-xl shadow-[0_0_20px_rgba(42,129,234,0.15)] border-2 border-blue-100 text-left animate-[bounce_1s_ease-in-out]">
-                <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-5">
-                  <h3 className="text-xl md:text-2xl font-black text-gray-800 flex items-center">
-                    <span className="text-3xl mr-3">📊</span>
-                    Dönemlik Kalite Denetim Raporu
-                  </h3>
-                  <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider hidden md:block">
-                    YÖKAK Standartlarına Uygun
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="flex flex-col items-center justify-center p-5 bg-gradient-to-b from-blue-50 to-white rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition">
-                    <span className="text-blue-600 text-xs font-bold uppercase tracking-widest mb-2">
-                      Zaman Yönetimi
-                    </span>
-                    <div className="text-5xl font-black text-blue-800 drop-shadow-sm">
-                      %{anketSonuclari.zamanlama}
-                    </div>
-                    <span className="text-xs text-gray-400 mt-2 font-medium">
-                      Dönem Ortalaması
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center p-5 bg-gradient-to-b from-emerald-50 to-white rounded-xl border border-emerald-100 shadow-sm hover:shadow-md transition">
-                    <span className="text-emerald-600 text-xs font-bold uppercase tracking-widest mb-2">
-                      Müfredat Uyumu
-                    </span>
-                    <div className="text-5xl font-black text-emerald-800 drop-shadow-sm">
-                      %{anketSonuclari.mufredat}
-                    </div>
-                    <span className="text-xs text-gray-400 mt-2 font-medium">
-                      Dönem Ortalaması
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center p-5 bg-gradient-to-b from-purple-50 to-white rounded-xl border border-purple-100 shadow-sm hover:shadow-md transition">
-                    <span className="text-purple-600 text-xs font-bold uppercase tracking-widest mb-2">
-                      Genel Memnuniyet
-                    </span>
-                    <div className="text-5xl font-black text-purple-800 drop-shadow-sm">
-                      %{anketSonuclari.memnuniyet}
-                    </div>
-                    <span className="text-xs text-gray-400 mt-2 font-medium">
-                      Dönem Ortalaması
-                    </span>
-                  </div>
-                </div>
-
-                {/* ERKEN UYARI PANELİ */}
-                <div className="flex items-start p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+              <div className="mb-8 animate-[bounce_1s_ease-in-out]">
+                <div className="flex items-start p-6 bg-red-50 border-l-4 border-red-500 rounded-r-xl shadow-md border-y border-r border-red-100 text-left">
                   <div className="flex-shrink-0 mt-0.5">
                     <svg
-                      className="h-5 w-5 text-red-500"
+                      className="h-7 w-7 text-red-500"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                     >
@@ -403,13 +349,16 @@ export default function HocaPaneli() {
                       />
                     </svg>
                   </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-bold text-red-800 uppercase tracking-wider">
+                  <div className="ml-4">
+                    <h3 className="text-lg font-black text-red-800 uppercase tracking-wide">
                       AKDS Erken Uyarı Sistemi Aktif
                     </h3>
-                    <p className="text-sm text-red-700 mt-1">
-                      Kritik devamsızlık sınırına ulaşan <b>2 öğrenci</b> tespit
-                      edildi. Danışman hocalarına otomatik uyarı ve
+                    <p className="text-md text-red-700 mt-1 font-medium">
+                      Kritik devamsızlık sınırına ulaşan{" "}
+                      <b className="text-red-900 bg-red-200 px-1 rounded">
+                        2 öğrenci
+                      </b>{" "}
+                      tespit edildi. Danışman hocalarına otomatik uyarı ve
                       bilgilendirme raporu dijital olarak iletilmiştir.
                     </p>
                   </div>
