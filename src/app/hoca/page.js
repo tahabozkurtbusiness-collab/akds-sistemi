@@ -60,19 +60,8 @@ export default function HocaPaneli() {
           .select("*")
           .eq("rol", "ogrenci");
 
-        // SUNUM SALONU VE SUNUM DERSİNİ LİSTEYE ENJEKTE EDİYORUZ
-        if (odaData) {
-          const sunumOdasi = { id: 999, oda_adi: "Sunum Salonu" };
-          setSiniflar([sunumOdasi, ...odaData]);
-        }
-        if (dersData) {
-          const sunumDersi = {
-            id: 999,
-            ders_kodu: "AKDS",
-            ders_adi: "Proje Tanıtımı",
-          };
-          setDersler([sunumDersi, ...dersData]);
-        }
+        if (odaData) setSiniflar(odaData);
+        if (dersData) setDersler(dersData);
         if (ogrenciData) setOgrenciListesi(ogrenciData);
 
         const { data: aktifOturumlar, error: oturumHata } = await supabase
@@ -186,7 +175,8 @@ export default function HocaPaneli() {
       return alert("Lütfen sınıf ve ders seçimi yapınız.");
     setYukleniyor(true);
     setAnlamayanSayisi(0);
-    setDersBitti(false); // Yeni ders başlarken paneli kapat
+    setKatilimciSayisi(0);
+    setDersBitti(false);
 
     await supabase
       .from("sessions")
@@ -198,18 +188,6 @@ export default function HocaPaneli() {
     const aktifDers = dersler.find((d) => d.id === parseInt(secilenDers));
 
     try {
-      // Şov verilerini veritabanına yazmadan sadece görsel olarak başlatıyoruz
-      if (secilenSinif === "999" || secilenDers === "999") {
-        setDersAdi("Proje Tanıtımı");
-        setKod(rastgeleKod);
-        setOturumId(999999); // Sahte ID
-        setOturumDurumu("aktif");
-        setSayac(60);
-        localStorage.setItem("dersBaslangicZamani", Date.now().toString());
-        setYukleniyor(false);
-        return;
-      }
-
       const { data, error } = await supabase
         .from("sessions")
         .insert([
@@ -242,10 +220,6 @@ export default function HocaPaneli() {
   };
 
   const molaVer = async () => {
-    if (oturumId === 999999) {
-      setOturumDurumu("uyku_modu");
-      return;
-    } // Şov Modu Bypass
     try {
       await supabase
         .from("sessions")
@@ -258,10 +232,6 @@ export default function HocaPaneli() {
   };
 
   const moladanDon = async () => {
-    if (oturumId === 999999) {
-      setOturumDurumu("aktif");
-      return;
-    } // Şov Modu Bypass
     try {
       await supabase
         .from("sessions")
@@ -276,20 +246,16 @@ export default function HocaPaneli() {
   const dersiBitir = async () => {
     if (confirm("Oturumu sonlandırmak istediğinize emin misiniz?")) {
       try {
-        if (oturumId !== 999999) {
-          // Şov modu değilse veritabanını güncelle
-          await supabase
-            .from("sessions")
-            .update({ durum: "bitti" })
-            .eq("id", oturumId);
-        }
+        await supabase
+          .from("sessions")
+          .update({ durum: "bitti" })
+          .eq("id", oturumId);
 
         setOturumId(null);
         setOturumDurumu(null);
         setKod(null);
         localStorage.removeItem("dersBaslangicZamani");
 
-        // VİZYON: Dersi bitirdiği an analiz panelini göster!
         setDersBitti(true);
       } catch (error) {
         alert("Hata: " + error.message);
@@ -300,14 +266,6 @@ export default function HocaPaneli() {
   const disiplinNotuKaydet = async () => {
     if (!secilenOgrenciId || !disiplinNotu)
       return alert("Öğrenci ve uyarı içeriği zorunludur.");
-
-    if (oturumId === 999999) {
-      // Şov Modu Bypass
-      alert("Kayıt başarıyla sisteme işlendi.");
-      setSecilenOgrenciId("");
-      setDisiplinNotu("");
-      return;
-    }
 
     try {
       const { error } = await supabase.from("discipline_records").insert([
@@ -379,7 +337,7 @@ export default function HocaPaneli() {
         {!oturumId ? (
           // DERS BAŞLATMA EKRANI
           <div className="bg-white p-8 rounded shadow-sm border border-gray-200 text-center">
-            {/* EKRANA GELEN KALİTE RAPORU VE ERKEN UYARI PANELİ BURADA! (Sadece ders bittikten sonra görünür) */}
+            {/* EKRANA GELEN KALİTE RAPORU VE ERKEN UYARI PANELİ */}
             {dersBitti && (
               <div className="mb-8 p-6 bg-white rounded-xl shadow-[0_0_20px_rgba(42,129,234,0.15)] border-2 border-blue-100 text-left animate-[bounce_1s_ease-in-out]">
                 <div className="flex justify-between items-center border-b border-gray-100 pb-4 mb-5">
@@ -493,15 +451,7 @@ export default function HocaPaneli() {
                 >
                   <option value="">-- Derslik Seçiniz --</option>
                   {siniflar.map((sinif) => (
-                    <option
-                      key={sinif.id}
-                      value={sinif.id}
-                      className={
-                        sinif.id === 999
-                          ? "font-bold text-[#2A81EA] bg-blue-50"
-                          : ""
-                      }
-                    >
+                    <option key={sinif.id} value={sinif.id}>
                       {sinif.oda_adi}
                     </option>
                   ))}
@@ -518,15 +468,7 @@ export default function HocaPaneli() {
                 >
                   <option value="">-- Ders Seçiniz --</option>
                   {dersler.map((ders) => (
-                    <option
-                      key={ders.id}
-                      value={ders.id}
-                      className={
-                        ders.id === 999
-                          ? "font-bold text-[#2A81EA] bg-blue-50"
-                          : ""
-                      }
-                    >
+                    <option key={ders.id} value={ders.id}>
                       {ders.ders_kodu} - {ders.ders_adi}
                     </option>
                   ))}
@@ -767,42 +709,6 @@ export default function HocaPaneli() {
               >
                 Kayıtlara İşle
               </button>
-            </div>
-
-            {/* Otomatik Denetim Paneli (Sabit Kalan) */}
-            <div className="bg-white p-6 rounded shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
-                <h3 className="text-md font-bold text-[#2d368f] flex items-center">
-                  <svg
-                    className="w-5 h-5 mr-2 text-[#2A81EA]"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                    ></path>
-                  </svg>
-                  Sistematik Devamsızlık Takibi
-                </h3>
-                <span className="text-xs font-bold text-[#2A81EA] bg-[#e0edff] px-2 py-1 rounded">
-                  AKTİF
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center p-3 bg-[#fff5f5] rounded border border-red-100">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-ping mr-3"></div>
-                  <p className="text-sm text-red-800">
-                    <span className="font-bold">220011</span> numaralı
-                    öğrencinin devam/devamsızlık limiti kritik seviyededir.
-                    İlgili durum raporu bölüm sekreterliğine iletilmiştir.
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         )}
