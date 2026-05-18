@@ -6,9 +6,6 @@ import { supabase } from "@/lib/supabase";
 export default function HocaPaneli() {
   const router = useRouter();
 
-  // ==========================================
-  // 1. STATE (DURUM) DEĞİŞKENLERİ
-  // ==========================================
   const [sayfaHazir, setSayfaHazir] = useState(false);
   const [hoca, setHoca] = useState(null);
 
@@ -31,12 +28,7 @@ export default function HocaPaneli() {
   const [anlamayanSayisi, setAnlamayanSayisi] = useState(0);
   const [katilimciSayisi, setKatilimciSayisi] = useState(0);
 
-  // VİZYON PANELİ İÇİN:
   const [dersBitti, setDersBitti] = useState(false);
-
-  // ==========================================
-  // 2. SİSTEM DİNLEYİCİLERİ (USE-EFFECT)
-  // ==========================================
 
   useEffect(() => {
     const kayitliKullanici = localStorage.getItem("kullanici");
@@ -161,10 +153,6 @@ export default function HocaPaneli() {
     };
   }, [oturumId]);
 
-  // ==========================================
-  // 3. FONKSİYONLAR (İŞ MANTIĞI)
-  // ==========================================
-
   const oturumBaslat = async () => {
     if (!secilenSinif || !secilenDers)
       return alert("Lütfen sınıf ve ders seçimi yapınız.");
@@ -281,10 +269,6 @@ export default function HocaPaneli() {
     }
   };
 
-  // ==========================================
-  // 4. ARAYÜZ (JSX)
-  // ==========================================
-
   if (!hoca || !sayfaHazir) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -297,7 +281,6 @@ export default function HocaPaneli() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      {/* KSÜ RESMİ WEB SİTESİ KLONU - ÜST BAR */}
       <header className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-6 shadow-sm mb-8 border-b border-gray-200 rounded">
         <div className="flex items-center gap-4 mb-4 md:mb-0">
           <img
@@ -330,9 +313,8 @@ export default function HocaPaneli() {
 
       <main className="max-w-4xl mx-auto">
         {!oturumId ? (
-          // DERS BAŞLATMA EKRANI
           <div className="bg-white p-8 rounded shadow-sm border border-gray-200 text-center">
-            {/* SADECE ERKEN UYARI PANELİ BURADA GÖSTERİLECEK */}
+            {/* ŞOV PANELİ: SADECE ERKEN UYARI VAR */}
             {dersBitti && (
               <div className="mb-8 animate-[bounce_1s_ease-in-out]">
                 <div className="flex items-start p-6 bg-red-50 border-l-4 border-red-500 rounded-r-xl shadow-md border-y border-r border-red-100 text-left">
@@ -436,9 +418,7 @@ export default function HocaPaneli() {
             </button>
           </div>
         ) : (
-          // AKTİF DERS YÖNETİM EKRANI
           <div className="space-y-6 animate-fade-in">
-            {/* Üst Bilgi Paneli */}
             <div className="bg-[#2d368f] text-white p-5 rounded shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 border-l-4 border-[#2A81EA]">
               <div>
                 <h2 className="text-xl font-bold">{dersAdi}</h2>
@@ -474,7 +454,6 @@ export default function HocaPaneli() {
               </div>
             </div>
 
-            {/* Yoklama Sayacı ve Kod Panosu */}
             {kod && (
               <div className="bg-white p-8 rounded shadow-sm text-center relative overflow-hidden border border-gray-200">
                 {sayac > 0 && oturumDurumu === "aktif" && (
@@ -499,20 +478,18 @@ export default function HocaPaneli() {
                 >
                   {kod}
                 </div>
-                {/* CANLI VE LOGOLU ÖZEL QR KOD */}
+
                 {sayac > 0 && oturumDurumu === "aktif" && (
                   <div className="mt-4 flex flex-col items-center justify-center border-t border-gray-100 pt-6">
                     <p className="text-xs font-bold text-[#2A81EA] uppercase tracking-widest mb-3">
                       İzleyiciler İçin Hızlı Katılım QR Kodu
                     </p>
-
                     <div className="relative p-2 bg-white border-2 border-dashed border-[#2A81EA] rounded-xl shadow-sm inline-block">
                       <img
                         src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=H&margin=1&data=${typeof window !== "undefined" ? encodeURIComponent(window.location.origin + "/misafir") : ""}`}
                         alt="QR Kod"
                         className="w-48 h-48 md:w-56 md:h-56"
                       />
-
                       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-1.5 shadow-lg flex items-center justify-center w-12 h-12 md:w-14 md:h-14">
                         <img
                           src="/logo.png"
@@ -542,7 +519,6 @@ export default function HocaPaneli() {
               </div>
             )}
 
-            {/* Gerçek Zamanlı Paneller */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-white p-5 rounded shadow-sm border border-gray-200 flex items-center justify-between transition-all duration-300">
                 <div>
@@ -603,7 +579,6 @@ export default function HocaPaneli() {
               </div>
             </div>
 
-            {/* Disiplin İşlemi Paneli */}
             <div className="bg-white p-6 rounded shadow-sm border border-gray-200">
               <h3 className="text-md font-bold text-[#2d368f] mb-4 border-b border-gray-100 pb-2 flex items-center">
                 <svg
